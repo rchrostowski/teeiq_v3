@@ -582,7 +582,12 @@ def main() -> None:
     # Sidebar: data source
     with st.sidebar:
         st.subheader("Tee Sheet Data")
-        tee_file = st.file_uploader("Upload tee-sheet CSV", type=["csv"])
+        tee_file = st.file_uploader(
+    "Upload tee-sheet CSV",
+    type=["csv"],
+    key="tee_sheet_upload_main",
+)
+
         use_demo = st.checkbox("Use demo data", value=not bool(tee_file))
 
         st.markdown("---")
