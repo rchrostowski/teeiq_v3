@@ -5,24 +5,21 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 import requests
 
-
 # ---------------------- GLOBAL STYLE ---------------------- #
 
 APP_CSS = """
 <style>
-/* Base */
 html, body, [class*="css"] {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
                  "Segoe UI", sans-serif;
 }
 
-/* App background */
 main.stApp {
     background: radial-gradient(circle at top, #0b2b1b 0, #021109 30%, #020b07 60%, #000 100%);
     color: #f4f6f3;
 }
 
-/* Hero header */
+/* Hero */
 .hero {
     background: linear-gradient(135deg, rgba(12, 50, 32, 0.95), rgba(26, 82, 52, 0.96));
     border-radius: 24px;
@@ -209,13 +206,7 @@ def coerce_bool(x):
         return x == 1
     if isinstance(x, str):
         return x.strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "y",
-            "booked",
-            "sold",
-            "reserved",
+            "1", "true", "yes", "y", "booked", "sold", "reserved"
         }
     return False
 
@@ -329,7 +320,7 @@ def utilization_matrix_hour(df: pd.DataFrame) -> pd.DataFrame:
     return grp["util"].unstack("hour").sort_index()
 
 
-# ---------------------- PRICING / MODEL ---------------------- #
+# ---------------------- PRICING MODEL ---------------------- #
 
 def featurize(tee_df: pd.DataFrame, slot_minutes: int = 10):
     df = add_time_bins(tee_df, slot_minutes=slot_minutes).copy()
@@ -379,7 +370,7 @@ def compute_pricing_actions(
     target_util: float = 0.75,
     top_n: int = 10,
 ) -> pd.DataFrame:
-    """Always returns the softest blocks, never empty unless no data."""
+    """Returns the softest blocks, never empty unless no data."""
     if tee_df.empty:
         return pd.DataFrame()
 
@@ -444,11 +435,11 @@ def build_text_report(df: pd.DataFrame, slot_minutes: int) -> str:
     today_date = df["date"].max()
     today_df = df[df["date"] == today_date]
     if not today_df.empty:
-        t_total, t_booked, t_util, t_rev, t_pot, _, _ = kpis(today_df)
+        t_total, t_booked, t_util, t_rev, t_pot, _, t_rpatt = kpis(today_df)
         t_gap = t_pot - t_rev
     else:
         t_total = t_booked = 0
-        t_util = t_rev = t_pot = t_gap = 0.0
+        t_util = t_rev = t_pot = t_gap = t_rpatt = 0.0
 
     trend = daily_utilization(df)
     avg_util_7d = trend["util"].tail(7).mean() * 100 if len(trend) >= 1 else 0.0
@@ -482,6 +473,7 @@ def build_text_report(df: pd.DataFrame, slot_minutes: int) -> str:
     lines.append(f"Utilization:       {t_util*100:.1f}%")
     lines.append(f"Booked revenue:    ${t_rev:,.0f}")
     lines.append(f"Revenue gap:       ${t_gap:,.0f}")
+    lines.append(f"RevPATT (today):   ${t_rpatt:,.0f}")
     lines.append("")
     lines.append("Recent trend")
     lines.append("------------")
@@ -514,7 +506,7 @@ def build_text_report(df: pd.DataFrame, slot_minutes: int) -> str:
     return "\n".join(lines)
 
 
-# ---------------------- OPTIONAL WEATHER ---------------------- #
+# ---------------------- WEATHER (OPTIONAL) ---------------------- #
 
 def fetch_daily_weather(lat: float, lon: float):
     """Free weather via Open-Meteo (no API key). Returns small DataFrame or None."""
@@ -579,15 +571,11 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    # Sidebar: data source
+    # Sidebar: data source and settings
     with st.sidebar:
         st.subheader("Tee Sheet Data")
-        tee_file = st.file_uploader(
-    "Upload tee-sheet CSV",
-    type=["csv"],
-    key="tee_sheet_upload_main",
-)
-
+        # 🔥 Only ONE uploader in the whole app, no key, no duplicates.
+        tee_file = st.file_uploader("Upload tee-sheet CSV", type=["csv"])
         use_demo = st.checkbox("Use demo data", value=not bool(tee_file))
 
         st.markdown("---")
@@ -605,6 +593,7 @@ def main() -> None:
         lon = st.number_input("Longitude", value=-82.020, format="%.6f")
         want_weather = st.checkbox("Include 7-day weather outlook", value=False)
 
+    # Data source
     if tee_file is not None:
         raw_df = pd.read_csv(tee_file)
     elif use_demo:
@@ -813,7 +802,6 @@ def main() -> None:
                 )
                 st.dataframe(actions, use_container_width=True)
 
-                # Quick viz of expected utilization
                 chart_df = actions.copy()
                 chart_df["UtilPct"] = chart_df["Expected Utilization"].str.rstrip(
                     "%"
@@ -880,7 +868,9 @@ def main() -> None:
                 axw.tick_params(axis="x", rotation=45)
                 st.pyplot(figw, use_container_width=True)
         else:
-            st.info("Enable 'Include 7-day weather outlook' in the sidebar to see weather here.")
+            st.info(
+                "Enable 'Include 7-day weather outlook' in the sidebar to see weather here."
+            )
 
         st.markdown(
             '<div class="section-header">Pace of Play (placeholder)</div>',
@@ -910,11 +900,6 @@ def main() -> None:
                 file_name="teeiq_elite_report.txt",
                 mime="text/plain",
             )
-
-
-if __name__ == "__main__":
-    main()
-
 
 
 if __name__ == "__main__":
